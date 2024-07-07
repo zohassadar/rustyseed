@@ -21,13 +21,13 @@ pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
             let mut s = i;
             for _ in 0..repeats {
                 if index == 1 && i == 0x1111 {
-                    dbg!(repeats);
+                    // dbg!(repeats);
                     println!("{:04X}", s);
                 }
                 s = shuffle_rng(s as u16)
             }
             if index == 1 && i == 0x1111 {
-                dbg!(repeats);
+                // dbg!(repeats);
                 println!("{:04X}", s);
             }
             by_repeats[index][i as usize] = s;
@@ -62,19 +62,20 @@ pub fn get_next_piece(
     // dbg!(spawn_id);
     // dbg!(repeats);
     let s3 = ((seed3 as u16 + 1) & 0xFF) as u8;
-    dbg!(s3);
+    // dbg!(s3);
     let rol_idx = ((seed1 as u16) << 8 | seed2 as u16) as usize;
     // dbg!(rpt_idx);
     // dbg!(rol_idx);
     let roll = by_repeats[repeat_nybble as usize][rol_idx];
-    println!("roll={:04X}", roll);
+    // println!("roll={:04X}", roll);
     // dbg!(shuffled::BY_REPEATS[rpt_idx][rol_idx]);
     // dbg!(roll);
     let mut s1 = (roll >> 8) as u8;
     // dbg!(s1);
     let mut s2 = (roll & 0xFF) as u8;
     // dbg!(s2);
-    let mut result = ((s1 as u16 + s2 as u16) & 0x7) as u8;
+    let mut result = ((s1 as u16 + s3 as u16) & 0x7) as u8;
+    // dbg!(result);
     if result == 7 || ORIENTATION_IDS[result as usize] == spawn_id {
         let reroll = shuffled[roll as usize];
         s1 = (reroll >> 8) as u8;
@@ -124,7 +125,7 @@ mod tests {
         let (shuffled, by_repeats) = get_pre_shuffle();
         // repeat nybble, set_seed+0, set_seed+1, set_seed+2, spawn_id
         assert_eq!(
-            (0x01, 0x01, 0x11, 0x02, 0x0A),
+            (0x01, 0x01, 0x10, 0x02, 0x0A),
             get_next_piece(0x01, 0x11, 0x11, 0x11, 0x00, &shuffled, &by_repeats)
         );
     }

@@ -79,16 +79,13 @@ fn crunch_seed(
     }
     let mut steps = 0;
     let mut path: IndexMap<(u8, u8, u8, u8, u8), (u8, u8, u8, u8, u8)> = IndexMap::new();
-    let mut repeats = 18;
-    if (seed3 >> 4) > 0 {
-        repeats = (seed3 >> 4) + 2;
-    }
+    let repeat_nybble = seed3 >> 4;
     let mut spawn_id: u8 = 0;
     let mut s1 = seed1;
     let mut s2 = seed2;
     let mut s3 = seed3;
     loop {
-        let id = (s1, s2 & 0xFE, s3 & 0x07, spawn_id, repeats);
+        let id = (repeat_nybble, s1, s2 & 0xFE, s3 & 0x07, spawn_id);
         //dbg!(original);
         for (loop_id, loop_map) in known_loops.into_iter() {
             if loop_map.contains_key(&id) {
@@ -99,14 +96,14 @@ fn crunch_seed(
             }
         }
         // dbg!(s1, s2, s3, spawn_id);
-        (s1, s2, s3, spawn_id, _) =
-            rng::get_next_piece(s1, s2, s3, spawn_id, repeats, &shuffled, &by_repeats);
+        (_, s1, s2, s3, spawn_id) =
+            rng::get_next_piece(repeat_nybble, s1, s2, s3, spawn_id,  &shuffled, &by_repeats);
         // dbg!(s1, s2, s3, spawn_id);
-        let new = (s1, s2 & 0xFE, s3 & 0x7, spawn_id, repeats);
+        let new = (repeat_nybble, s1, s2 & 0xFE, s3 & 0x7, spawn_id);
         // dbg!(path.clone());
         if path.contains_key(&new) {
-            dbg!(og);
-            dbg!(path.clone().keys().len());
+            // dbg!(og);
+            // dbg!(path.clone().keys().len());
             let loop_start = path
                 .clone()
                 .into_iter()
@@ -164,9 +161,9 @@ fn main() {
     > = IndexMap::new();
 
     println!("Hello, world!");
-    for x in 0..=0x1 {
+    for x in 0..=0xFF {
         println!("x is {}", x);
-        for y in 0..=0xF {
+        for y in 0..=0xFF {
             println!("y is {}", y);
             for z in 0..=0xFF {
                 crunch_seed(
