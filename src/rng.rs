@@ -20,16 +20,16 @@ pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
         for i in 0..=0xFFFF {
             let mut s = i;
             for _ in 0..repeats {
-                if index == 1 && i == 0x1111 {
-                    // dbg!(repeats);
-                    println!("{:04X}", s);
-                }
+                // if index == 1 && i == 0x1111 {
+                //     // dbg!(repeats);
+                //     println!("{:04X}", s);
+                // }
                 s = shuffle_rng(s as u16)
             }
-            if index == 1 && i == 0x1111 {
-                // dbg!(repeats);
-                println!("{:04X}", s);
-            }
+            // if index == 1 && i == 0x1111 {
+            //     // dbg!(repeats);
+            //     println!("{:04X}", s);
+            // }
             by_repeats[index][i as usize] = s;
             // dbg!(by_repeats[index][i as usize]);
         }
