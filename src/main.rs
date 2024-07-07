@@ -97,7 +97,7 @@ fn crunch_seed(
         }
         // dbg!(s1, s2, s3, spawn_id);
         (_, s1, s2, s3, spawn_id) =
-            rng::get_next_piece(repeat_nybble, s1, s2, s3, spawn_id,  &shuffled, &by_repeats);
+            rng::get_next_piece(repeat_nybble, s1, s2, s3, spawn_id, &shuffled, &by_repeats);
         // dbg!(s1, s2, s3, spawn_id);
         let new = (repeat_nybble, s1, s2 & 0xFE, s3 & 0x7, spawn_id);
         // dbg!(path.clone());
@@ -161,7 +161,7 @@ fn main() {
     > = IndexMap::new();
 
     println!("Hello, world!");
-    for x in 0..=0xFF {
+    for x in 0..=0x00 {
         println!("x is {}", x);
         for y in 0..=0xFF {
             println!("y is {}", y);
@@ -185,7 +185,7 @@ fn main() {
         known_loops.keys().len()
     );
 
-    for (loop_id, loop_map) in known_loops.into_iter() {
+    for (loop_id, loop_map) in known_loops.clone().into_iter() {
         println!(
             "Loop id {} {} {} {} {} - {}",
             loop_id.0,
@@ -196,4 +196,18 @@ fn main() {
             loop_map.keys().len(),
         );
     }
+    let seed_len = known_seeds.keys().len();
+    let loop_len = known_loops.keys().len();
+    let avg = known_seeds
+        .into_iter()
+        .map(|(_, v)| v.0 as u64)
+        .sum::<u64>() as f64
+        / seed_len as f64;
+    let avg_loop = known_loops
+        .into_iter()
+        .map(|(_, v)| v.len() as u64)
+        .sum::<u64>() as f64
+        / loop_len as f64;
+    println!("Average steps until loop: {}", avg);
+    println!("Average loop size: {}", avg_loop);
 }
