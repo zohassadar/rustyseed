@@ -1,29 +1,60 @@
+use gumdrop::Options;
 use indexmap::IndexMap;
+use std::fs::File;
+use std::process::Command;
+use std::io::prelude::*;
+mod rng;
+mod shuffled;
+pub fn write_pre_shuffle() -> std::io::Result<()> {
+    let mut file = File::create("src/shuffled.rs")?;
+    // one roll index
+    let mut shuffled: [u16; 0x10000] = [0; 0x10000];
+    for i in 0..0x10000 {
+        shuffled[i] = rng::shuffle_rng(i as u16);
+        // dbg!(shuffled[i]);
+    }
 
-fn shuffle_rng(rng: u16) -> u16 {
-    let rng_hi = rng >> 8;
-    let rng_lo = rng & 0xFF;
-    let newbit = ((rng_hi ^ rng_lo) & 2) << 6;
-    let new_hi = newbit | rng_hi >> 1;
-    let new_lo = ((rng_hi & 1) << 7) | (rng_lo >> 1);
-    return new_hi << 8 | new_lo;
+    // create shortcut arrays using one roll index
+    let mut by_repeats: [[u16; 0x10000]; 0x10] = [[0; 0x10000]; 0x10];
+    for index in 0..16 {
+        let repeats = index + 3;
+        for i in 0..=0xFFFF {
+            let mut s = i;
+            for _ in 0..repeats {
+                s = rng::shuffle_rng(i as u16)
+            }
+            by_repeats[index][i as usize] = s;
+            // dbg!(by_repeats[index][i as usize]);
+        }
+    }
+    file.write_all(b"pub static BY_REPEATS: [[u16; 0x10000]; 0x10] = [\n")?;
+    for index in 0..16 {
+        file.write_all(b"    [\n")?;
+        for seed_idx in 0..=0xFFFF {
+            let seed = by_repeats[index][seed_idx];
+            file.write_all(format!("        0x{seed:04X},\n").as_bytes())?;
+        }
+        file.write_all(b"    ],\n")?;
+    }
+    file.write_all(b"];")?;
+
+    let _ = Command::new("rustfmt").arg("src/shuffled.rs").output().expect("");
+    Ok(())
 }
 
 fn crunch_seed(
     seed1: u8,
     seed2: u8,
     seed3: u8,
-    known_seeds: &mut IndexMap<(u8, u8, u8), (i32, (u8, u8, u8, u8), u32)>,
+    known_seeds: &mut IndexMap<(u8, u8, u8), (u32, u32, (u8, u8, u8, u8))>,
     known_loops: &mut IndexMap<(u8, u8, u8, u8), IndexMap<(u8, u8, u8, u8), (u8, u8, u8, u8)>>,
-    by_repeats: &[[u16; 0x10000]; 0x10],
+    orientation_ids: &[u8; 0x7],
 ) {
-    let orientation_ids: [u8; 0x7] = [0x02, 0x07, 0x08, 0x0A, 0x0B, 0x0E, 0x12];
-
     let og = (seed1, seed2 & 0xFE, seed3 & 0xF7);
     if known_seeds.contains_key(&og) {
         return;
     }
-    let mut i = 0;
+    let mut steps = 0;
     let mut path: IndexMap<(u8, u8, u8, u8), (u8, u8, u8, u8)> = IndexMap::new();
     let mut repeats = 18;
     if (seed3 >> 4) > 0 {
@@ -42,25 +73,15 @@ fn crunch_seed(
                     .into_iter()
                     .position(|(&l, _)| l == original)
                     .unwrap();
-                known_seeds.insert(og, (i, *loop_id, index as u32));
+                // println!("New seed found: {:#?}", loop_id);
+                known_seeds.insert(og, (steps as u32, index as u32, *loop_id));
                 return;
             }
         }
-        // dbg!(s3);
-        s3 = ((s3 as u16 + 1) & 0xFF) as u8;
-        // dbg!(repeats);
-        let seed = by_repeats[(repeats - 3) as usize][((s1 as u16) << 8 | s2 as u16) as usize];
-        s1 = (seed << 8) as u8;
-        s2 = (seed & 0xFF) as u8;
-        let mut result = (s1 + s2) & 0x7;
-        if result == 7 || orientation_ids[result as usize] == spawn_id {
-            let new_seed =
-                by_repeats[(repeats - 3) as usize][((s1 as u16) << 8 | s2 as u16) as usize];
-            s1 = (new_seed << 8) as u8;
-            s2 = (new_seed & 0xFF) as u8;
-            result = (((s1 & 7) + spawn_id) & 0xFF) % 7;
-        }
-        spawn_id = orientation_ids[result as usize];
+        // dbg!(s1, s2, s3, spawn_id);
+        let new = rng::get_next_piece(s1, s2, s3, spawn_id, repeats, &orientation_ids);
+        (s1, s2, s3, spawn_id) = new;
+        // dbg!(s1, s2, s3, spawn_id);
         let new = (s1, s2, s3, spawn_id);
         if path.contains_key(&new) {
             // dbg!(path.clone());
@@ -82,40 +103,54 @@ fn crunch_seed(
             }
             // dbg!(new_loop.clone());
             known_loops.insert(new, new_loop);
-            known_seeds.insert(og, (i, new, 0));
+            known_seeds.insert(og, (steps as u32, 0, new));
             return;
         }
         // dbg!(path.clone());
-        i += 32;
+        steps += 32;
         path.insert(original, new);
     }
 }
 
+fn parse_hex(s: &str) -> Result<u32, std::num::ParseIntError> {
+    u32::from_str_radix(s, 16)
+}
+
+#[derive(Debug, Options)]
+struct TestOptions {
+    help: bool,
+    #[options(help = "make pre shuffle table")]
+    make_table: bool,
+    foo: bool,
+}
+
 fn main() {
-    let mut known_seeds: IndexMap<(u8, u8, u8), (i32, (u8, u8, u8, u8), u32)> = IndexMap::new();
+    let options = TestOptions::parse_args_default_or_exit();
+    if options.make_table {
+        println!("Making new shuffle table");
+        let _ = write_pre_shuffle();
+
+        return;
+    }
+    let orientation_ids: [u8; 0x7] = [0x02, 0x07, 0x08, 0x0A, 0x0B, 0x0E, 0x12];
+    let mut known_seeds: IndexMap<(u8, u8, u8), (u32, u32, (u8, u8, u8, u8))> = IndexMap::new();
     let mut known_loops: IndexMap<(u8, u8, u8, u8), IndexMap<(u8, u8, u8, u8), (u8, u8, u8, u8)>> =
         IndexMap::new();
-    let mut shuffled: [u16; 0x10000] = [0; 0x10000];
-    for i in 0..0x10000 {
-        shuffled[i] = shuffle_rng(i as u16);
-    }
-    let mut by_repeats: [[u16; 0x10000]; 0x10] = [[0; 0x10000]; 0x10];
-    for index in 0..16 {
-        let repeats = index + 3;
-        for i in 0..=0xFFFF {
-            let mut s = i;
-            for i in 0..repeats {
-                s = shuffle_rng(i as u16)
-            }
-            by_repeats[index][i as usize] = s;
-        }
-    }
+
+
     println!("Hello, world!");
-    for x in 0..=0xFF {
+    for x in 0..=0xF {
         println!("x is {}", x);
         for y in 0..=0xFF {
             for z in 0..=0xFF {
-                crunch_seed(x, y, z, &mut known_seeds, &mut known_loops, &by_repeats);
+                crunch_seed(
+                    x,
+                    y,
+                    z,
+                    &mut known_seeds,
+                    &mut known_loops,
+                    &orientation_ids,
+                );
             }
         }
         // what to do with known_seeds and known_loops?
@@ -125,4 +160,15 @@ fn main() {
         known_seeds.keys().len(),
         known_loops.keys().len()
     );
+
+    for (loop_id, loop_map) in known_loops.into_iter() {
+        println!(
+            "Loop id {} {} {} {} - {}",
+            loop_id.0,
+            loop_id.1,
+            loop_id.2,
+            loop_id.3,
+            loop_map.keys().len(),
+        );
+    }
 }
