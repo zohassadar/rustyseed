@@ -1,7 +1,7 @@
 use gumdrop::Options;
 mod rng;
 
-const SEED_LIMIT: u16 = 750;
+const SEED_LIMIT: u16 = 850;
 
 fn crunch_seed(
     seed1: u8,
