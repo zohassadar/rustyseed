@@ -4,6 +4,14 @@ const PIECE_MAP: [&str; 0x13] = [
     "", "", "T", "", "", "", "", "J", "Z", "", "O", "S", "", "", "L", "", "", "", "I",
 ];
 
+pub fn get_string_from_sequence(sequence: &Vec<u8>) -> String {
+    return sequence
+        .iter()
+        .map(|&s| PIECE_MAP[s as usize])
+        .collect::<Vec<&str>>()
+        .join("");
+}
+
 pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
     let mut shuffled: Vec<u16> = vec![0; 0x10000];
     for i in 0..0x10000 {
