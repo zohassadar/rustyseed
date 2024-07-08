@@ -67,7 +67,11 @@ fn main() {
         };
         let sequence = rng::crunch_seed(s1, s2, s3, &shuffled, &by_repeats, length);
         if options.print {
-            println!("{}", rng::get_string_from_sequence(&sequence))
+            println!(
+                "{:06X}: {}",
+                specific_seed,
+                rng::get_string_from_sequence(&sequence)
+            )
         };
     }
 
@@ -115,12 +119,11 @@ fn main() {
                     continue;
                 }
                 let sequence = rng::crunch_seed(x, y, z, &shuffled, &by_repeats, length);
-                if options.print {
-                    println!("{}", rng::get_string_from_sequence(&sequence))
+                let seed = i32_from_bytes(x, y, z);
+                if options.print && specific_seed == 0 {
+                    println!("{:06X}: {}", seed, rng::get_string_from_sequence(&sequence))
                 };
                 if options.stats {
-                    let seed = i32_from_bytes(x, y, z);
-
                     let tpieces = sequence.clone().iter().filter(|&s| *s == 2).count();
                     let jpieces = sequence.clone().iter().filter(|&s| *s == 7).count();
                     let zpieces = sequence.clone().iter().filter(|&s| *s == 8).count();
