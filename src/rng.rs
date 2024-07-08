@@ -1,14 +1,14 @@
 const ORIENTATION_IDS: [u8; 0x7] = [0x02, 0x07, 0x08, 0x0A, 0x0B, 0x0E, 0x12];
-pub fn add_two(num: u16) -> u16 {
-    return num + num;
-}
+
+const PIECE_MAP: [&str; 0x13] = [
+    "", "", "T", "", "", "", "", "J", "Z", "", "O", "S", "", "", "L", "", "", "", "I",
+];
+
 pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
     let mut shuffled: Vec<u16> = vec![0; 0x10000];
     for i in 0..0x10000 {
         shuffled[i] = shuffle_rng(i as u16);
-        // dbg!(shuffled[i]);
     }
-
     // create shortcut arrays using one roll index
     let mut by_repeats: Vec<Vec<u16>> = vec![vec![0; 0x10000]; 0x10];
     for index in 0..0x10 {
@@ -20,24 +20,15 @@ pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
         for i in 0..=0xFFFF {
             let mut s = i;
             for _ in 0..repeats {
-                // if index == 1 && i == 0x1111 {
-                //     // dbg!(repeats);
-                //     println!("{:04X}", s);
-                // }
                 s = shuffle_rng(s as u16)
             }
-            // if index == 1 && i == 0x1111 {
-            //     // dbg!(repeats);
-            //     println!("{:04X}", s);
-            // }
             by_repeats[index][i as usize] = s;
-            // dbg!(by_repeats[index][i as usize]);
         }
     }
     return (shuffled, by_repeats);
 }
+
 pub fn shuffle_rng(rng: u16) -> u16 {
-    add_two(2);
     let rng_hi = rng >> 8;
     let rng_lo = rng & 0xFF;
     let newbit = ((rng_hi ^ rng_lo) & 2) << 6;
@@ -55,27 +46,12 @@ pub fn get_next_piece(
     shuffled: &Vec<u16>,
     by_repeats: &Vec<Vec<u16>>,
 ) -> (u8, u8, u8, u8, u8) {
-    // increment and rollover 3rd byte
-    // dbg!(seed1);
-    // dbg!(seed2);
-    // dbg!(seed3);
-    // dbg!(spawn_id);
-    // dbg!(repeats);
     let s3 = ((seed3 as u16 + 1) & 0xFF) as u8;
-    // dbg!(s3);
     let rol_idx = ((seed1 as u16) << 8 | seed2 as u16) as usize;
-    // dbg!(rpt_idx);
-    // dbg!(rol_idx);
     let roll = by_repeats[repeat_nybble as usize][rol_idx];
-    // println!("roll={:04X}", roll);
-    // dbg!(shuffled::BY_REPEATS[rpt_idx][rol_idx]);
-    // dbg!(roll);
     let mut s1 = (roll >> 8) as u8;
-    // dbg!(s1);
     let mut s2 = (roll & 0xFF) as u8;
-    // dbg!(s2);
     let mut result = ((s1 as u16 + s3 as u16) & 0x7) as u8;
-    // dbg!(result);
     if result == 7 || ORIENTATION_IDS[result as usize] == spawn_id {
         let reroll = shuffled[roll as usize];
         s1 = (reroll >> 8) as u8;
@@ -86,18 +62,35 @@ pub fn get_next_piece(
 
     // clear out bits that don't do anything
     let new = (repeat_nybble, s1, s2 & 0xFE, s3 & 0x7, new_id);
-    // dbg!(new);
     return new;
+}
+
+pub fn crunch_seed(
+    seed1: u8,
+    seed2: u8,
+    seed3: u8,
+    shuffled: &Vec<u16>,
+    by_repeats: &Vec<Vec<u16>>,
+    length: i32,
+) -> Vec<u8> {
+    let mut sequence: Vec<u8> = Vec::new();
+    let repeat_nybble = seed3 >> 4;
+    let mut spawn_id: u8 = 0;
+    let mut s1 = seed1;
+    let mut s2 = seed2;
+    let mut s3 = seed3;
+    for _ in 0..length {
+        (_, s1, s2, s3, spawn_id) =
+            get_next_piece(repeat_nybble, s1, s2, s3, spawn_id, &shuffled, &by_repeats);
+        sequence.push(spawn_id);
+    }
+    return sequence;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn internal() {
-        assert_eq!(4, add_two(2));
-    }
     #[test]
     fn test_lfsr() {
         assert_eq!(0x84EF, shuffle_rng(0x09DF));
@@ -108,7 +101,7 @@ mod tests {
         assert_eq!(0x0000, shuffle_rng(0x0000));
     }
     #[test]
-    fn test_poop() {
+    fn test_pre_shuffled() {
         let (shuffled, by_repeats) = get_pre_shuffle();
         assert_eq!(0x84EF, shuffled[0x09DF]);
         assert_eq!(0x84EF, shuffled[0x09DF]);
