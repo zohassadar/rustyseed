@@ -37,45 +37,32 @@ pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
 }
 
 pub fn shuffle_rng(rng: u16) -> u16 {
-    let rng_hi = rng >> 8;
-    let rng_lo = rng & 0xFF;
-    let newbit = ((rng_hi ^ rng_lo) & 2) << 6;
-    let new_hi = newbit | rng_hi >> 1;
-    let new_lo = ((rng_hi & 1) << 7) | (rng_lo >> 1);
-    return new_hi << 8 | new_lo;
+    return (((rng << 8) ^ rng) & 0x200) << 6 | rng >> 1;
 }
 
 pub fn get_next_piece(
     repeat_nybble: u8,
-    seed1: u8,
-    seed2: u8,
+    seed: u16,
     seed3: u8,
     spawn_id: u8,
     shuffled: &Vec<u16>,
     by_repeats: &Vec<Vec<u16>>,
-) -> (u8, u8, u8, u8, u8) {
+) -> (u8, u16, u8, u8) {
     let s3 = ((seed3 as u16 + 1) & 0xFF) as u8;
-    let rol_idx = ((seed1 as u16) << 8 | seed2 as u16) as usize;
-    let roll = by_repeats[repeat_nybble as usize][rol_idx];
-    let mut s1 = (roll >> 8) as u8;
-    let mut s2 = (roll & 0xFF) as u8;
-    let mut result = ((s1 as u16 + s3 as u16) & 0x7) as u8;
-    if result == 7 || ORIENTATION_IDS[result as usize] == spawn_id {
-        let reroll = shuffled[roll as usize];
-        s1 = (reroll >> 8) as u8;
-        s2 = (reroll & 0xFF) as u8;
-        result = (((s1 & 7) + spawn_id) & 0xFF) % 7;
+    let mut roll = by_repeats[repeat_nybble as usize][seed as usize];
+    let mut result = (((roll >> 8) + s3 as u16) & 0x7) as usize;
+    if result == 7 || ORIENTATION_IDS[result] == spawn_id {
+        roll = shuffled[roll as usize];
+        result = (((((roll >> 8) & 7) + spawn_id as u16) & 0xFF) % 7) as usize;
     }
-    let new_id = ORIENTATION_IDS[result as usize];
-
+    let new_id = ORIENTATION_IDS[result];
     // clear out bits that don't do anything
-    let new = (repeat_nybble, s1, s2 & 0xFE, s3 & 0x7, new_id);
+    let new = (repeat_nybble, roll & 0xFFFE, s3 & 0x7, new_id);
     return new;
 }
 
 pub fn crunch_seed(
-    seed1: u8,
-    seed2: u8,
+    seed: u16,
     seed3: u8,
     shuffled: &Vec<u16>,
     by_repeats: &Vec<Vec<u16>>,
@@ -84,12 +71,11 @@ pub fn crunch_seed(
 ) {
     let repeat_nybble = seed3 >> 4;
     let mut spawn_id: u8 = 0;
-    let mut s1 = seed1;
-    let mut s2 = seed2;
+    let mut s = seed;
     let mut s3 = seed3;
     for index in 0..length as usize {
-        (_, s1, s2, s3, spawn_id) =
-            get_next_piece(repeat_nybble, s1, s2, s3, spawn_id, &shuffled, &by_repeats);
+        (_, s, s3, spawn_id) =
+            get_next_piece(repeat_nybble, s, s3, spawn_id, &shuffled, &by_repeats);
         sequence[index] = spawn_id;
     }
 }
@@ -124,24 +110,24 @@ mod tests {
     #[test]
     fn test_sequences() {
         let (shuffled, by_repeats) = get_pre_shuffle();
-        let (s1, s2, s3) = (0x11, 0x11, 0x11);
+        let (s, s3) = (0x1111, 0x11);
         let expected = "OOTJTJOSZTZOSLTOJTLTZZIZIOZIJTOLLSJSJZOITZZSOLISOLLZJJZSIZSISIZSLITITSOOIJZJTLOILSSSSTJIJOJLTJSZTSLJTOSLSOSZILSISTOJSIOITSZZTSSTZJZITZZSZITJTISLOZILITZJOZSTTZIOZTLISITLLSISLITLISOOZTLSISSLTSZSTJZTSJTSJZZILIOSLTSZOZSZOTILOLOZTIZISJTLJLJZIZJTZOJLOSOITITOTOSTLIOZOTJOTSOZIJTIJOTOLITOJOZIZOLTZJOLJISTLJOZJJLITLJSOJTZOILSZSZJOZTSTJISLSITISJTZTSISZSZTSJLSJOTLJTJJLOJLITZJITJOZLTIJSLTZJIOISTZOJLJLZIOTSSLOJZLJLTITSLZLZTLSISZTOTZTJSTSLJTZSLSIZOITLTJOZSZZTIJTJJLZTZLSLTZJZILITSLJSZLLJLSLJTJOOTZSJTLITTOOTJTSLJSILSILITZLZJIZSTOZIOTLTOIJOZTLTZLSTJZIOITIOJZSLSTITZTLSZJSLITJZJTZLSTSJZOJTZJIJOTZOLLIZOTIJSOJOOTLTLZJOOJLTJZSOIZITLIJJSSZSLSIOTOLTJTOTOLISLJSJOTZLITZJLZTLIILTJJISZOSJIZLSTZOITIOTOSZJLOSTIOZSZOSLZJOZTSSIOTSZTTJLSIOSZTLJZOZSSTJLOJZITZJLTSSZIOOSTZTJSTLTLOSTTLSITZTOZLOTLJILTZISZJTLOSJSOJLJLTJLITZJIOZTISZLZJJTSLOSJIJSTSLOJTZLJTSLSOTZOIIZOJISTJOSTLSOSTZIOTOSZJLJZLZJLSZLISTZSITSITZTZOLSSOTITOILIZJZJTISTLSSJLZITZLTZOTJITJOIOTLZJTISLSZISSIOIZJLSISLZSZSITISLTISITJTZJSLZZJLIJLZTIZIJOZIJOITIOJZOOSTOIZOLJSO";
         let mut sequence = vec![0; expected.len() as usize].into_boxed_slice();
-        let _ = crunch_seed(s1, s2, s3, &shuffled, &by_repeats, &mut sequence, 1000);
+        let _ = crunch_seed(s, s3, &shuffled, &by_repeats, &mut sequence, 1000);
         let string = get_string_from_sequence(&sequence);
         assert_eq!(string, expected);
 
-        let (s1, s2, s3) = (0xFF, 0xFF, 0xFF);
+        let (s, s3) = (0xFFFF, 0xFF);
         let expected = "TZTSILSOOJZJZSOZOLILTZSJOIOTLJSTZOJILTSTLJZILTTISJOZJTSLZJSZTSIOISLTSSLJSSTOOISTZJOTOTOZSILISOLSITZIOZLJZOZSZZOLTLLTZIJLZLOZILSTSOIJLTOTZLILOJOTIOSTJLTOSJLSTJLOZLSISOLJZOJILJSZOSTSITOJZJZIOSITZTOJSIJISZLJOZTITZIJOISIJTJSOJZSTZILOJTZISITIOSOTIZOOZJOZJTZZILIOITOTILTJOIJIZOOLZOIZJZZJZISJZSOTZLTJLSIOTIJSZSJSTOSJLSISTZTJOOILOZOIJTOTLTJIOLSTZJSTZOJZJZTOJJILSZTSLIZJTITSZLZSLOTZOTITJLJIJLZSOTLSLZJSTZTTZOITLTJSJOTIOISOSLOZLZJLJZLTSLZTJIZTZOITLJSLIJLTJSJTLSJTJOZZOTSOJOZOIJITZLZIOLOZIZIJTSTIOTJSIOTSOLTJZOLJSOSJSIJIJJTSLOZZLSOTZTSZILSIOZLZZTSJZJTSZSISTSISOIOJSIOOLTOJSOTOSZISSTLZIOZIOIZJZJLZLZTJITLTLJOTIOSLOSOOJSLSJTLTSJZLOJTJZJSOZJSTOTSOTSZTZTSOJZJLJTSTZJOILTLIZTOJTILSTILTIOLTZLLZIJOZJTSILOSILITOJSOJZSTOZLOZOLSJZIJZJIJSZLOSLSLLTTSOZOOTSISISTJISSOLOISOTZOIJIOLTISOOTSJOJJTIOTOILSTLSOJSSOSLISLLSZOOZIOJSOTSIOSTZTITSIZTOJOJOISIOJOZOLITOTLJOZSIZLOTZTJOZJSOTSSTOSTSIJILISIZSZJTIJOTJOLTISZJIOILZSITOIOSJZTZOSTOSSOLIZJSOZLOLTOLOZSJLOJTZILZITLSJOSOZOLSISLZLJSLTISOILOLIJLIZSIZTZTZTJZJSLTLISJSTSJOZOOTJSIOOSTOLT";
         let mut sequence = vec![0; expected.len() as usize].into_boxed_slice();
-        let _ = crunch_seed(s1, s2, s3, &shuffled, &by_repeats, &mut sequence, 1000);
+        let _ = crunch_seed(s, s3, &shuffled, &by_repeats, &mut sequence, 1000);
         let string = get_string_from_sequence(&sequence);
         assert_eq!(string, expected);
 
-        let (s1, s2, s3) = (0x88, 0x88, 0x88);
+        let (s, s3) = (0x8888, 0x88);
         let expected = "JOSTZIOJSTLTTLSOLSZOLISLIOLTSSOTZOZTJJTJZSIJLTSJTZTJLTSJSISTTZZJTJZSTIOZISJJZJSJSJILOJLSIOTJLOSJILIZJSSLJILTOJISIJZLOTSJOIOTTIJTOOISJOZJTJIOLSIOISTJILZILITJSOTOSZSISLITZOIZJTOLOSJIOLILIOLSOZSOIOZTTOOLITZITTJTLOLITSJTOSTIOLTIOTSTZJTOSZTJZJSSZJZLJTZTSIJOIZOJLZJZLIOLTJOIOTZISOJLSSOLIOIZILOTSLZOLTJOSIZIOLZLZOLISOJLTZLSOSZTSZSTOLZLOZSJTTIJSZLZLISZLJLSOJTLOZJISJITSILJLJJTZJZLSLOITSITLJLITITTOLILOISOTISOLTSZIZJIJZJLZOTIJOLTTITIZTSTTSITOTJSJSZZLTISTTOSLILSISZSLJOSJSJITIOISJTZIITSIOTJSIJLTITLOJIOJSOOTLZIJZJOOLLZJSOSTSSZISTZOLOZILTSZOTSLJZSLZOLJZISZOTJJSSILZSLIJIOITOZTOLZSOIZLOZSZJOIJLOJOSTJTLSIZLJZZJTIZOLJTOLSOZTJZSJTZLTOJJLIZTSTTISOSILTLISITJTIZOZSZISIZLJIIJTILZJIOITSOOITZSILJLTOIOOJZSZJLSTSLZOZJTJIZJISJZSOJSJTSJLSLOJZTSOLTZJTIZLTISJZSOJLLJTOSIJSLZIZOSJLJJISJOITOLIOOZSSJLTJOIJOSISOJTIOJTJOSOZJZOLIOIZOJOOZLTLTOSITISJZITIZTOTSOSOLOOTIJSOJSZSZLOZSTSTJLOLTSJLTISOSLOTLJSILTJTITZJZJSOZJTZIOZSTJJSOSTILTOTIZTJTOJZIZJZTOSJLIOISLTIZSLISZSTZSTILTIZJOTJJOJZJOLTSOSLTJZOJLSTZLSSZIJIOSIJLSOLZJTJSZSZJLZTOIOZZ";
         let mut sequence = vec![0; expected.len() as usize].into_boxed_slice();
-        let _ = crunch_seed(s1, s2, s3, &shuffled, &by_repeats, &mut sequence, 1000);
+        let _ = crunch_seed(s, s3, &shuffled, &by_repeats, &mut sequence, 1000);
         let string = get_string_from_sequence(&sequence);
         assert_eq!(string, expected);
     }
@@ -151,8 +137,8 @@ mod tests {
         let (shuffled, by_repeats) = get_pre_shuffle();
         // repeat nybble, set_seed+0, set_seed+1, set_seed+2, spawn_id
         assert_eq!(
-            (0x01, 0x01, 0x10, 0x02, 0x0A),
-            get_next_piece(0x01, 0x11, 0x11, 0x11, 0x00, &shuffled, &by_repeats)
+            (0x01, 0x0110, 0x02, 0x0A),
+            get_next_piece(0x01, 0x1111, 0x11, 0x00, &shuffled, &by_repeats)
         );
     }
 }

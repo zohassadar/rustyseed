@@ -25,8 +25,8 @@ struct TestOptions {
 fn parse_hex(s: &str) -> Result<u32, std::num::ParseIntError> {
     u32::from_str_radix(s, 16)
 }
-fn i32_from_bytes(x: u8, y: u8, z: u8) -> i32 {
-    return ((x as i32) << 16 | (y as i32) << 8 | z as i32) as i32;
+fn i32_from_bytes(x: u16, z: u8) -> i32 {
+    return ((x as i32) << 8 | z as i32) as i32;
 }
 
 fn check_if_most(count: u16, seed: i32, current_most: u16, current_seed: i32) -> (u16, i32) {
@@ -58,15 +58,14 @@ fn main() {
     let (shuffled, by_repeats) = rng::get_pre_shuffle();
 
     if specific_seed != 0 {
-        let s1 = ((specific_seed >> 16) & 0xFF) as u8;
-        let s2 = ((specific_seed >> 8) & 0xFF) as u8;
+        let s = (specific_seed >> 8) as u16;
         let s3 = (specific_seed & 0xFF) as u8;
-        if s1 == 0 && s2 & 0xFE == 0 {
+        if s & 0xFFFE == 0 {
             println!("invalid seed {:06X}", specific_seed);
             return;
         };
         let mut sequence = vec![0; length as usize].into_boxed_slice();
-        let _ = rng::crunch_seed(s1, s2, s3, &shuffled, &by_repeats, &mut sequence, length);
+        let _ = rng::crunch_seed(s, s3, &shuffled, &by_repeats, &mut sequence, length);
         if options.print {
             println!(
                 "{:06X}: {}",
@@ -110,20 +109,19 @@ fn main() {
     let mut most_l_seed: i32 = 0;
     let mut most_i_seed: i32 = 0;
 
-    for x in 0x00..=0xFF {
-        for y in 0x00..=0xFF {
+    for x in 0x00..=0xFFFF {
             for z in 0x00..=0xFF {
-                if x == 0 && y & 0xFE == 0 {
+                if x & 0xFFFE == 0 {
                     // invalid seed
                     continue;
                 }
-                if z & 0x08 == 0x08 || y & 0x01 == 0x01 {
+                if z & 0x08 == 0x08 || x & 0x1 == 0x1 {
                     // duplicate seed
                     continue;
                 }
                 let mut sequence = vec![0; length as usize].into_boxed_slice();
-                let _ = rng::crunch_seed(x,y,z, &shuffled, &by_repeats, &mut sequence, length);
-                let seed = i32_from_bytes(x, y, z);
+                let _ = rng::crunch_seed(x,z, &shuffled, &by_repeats, &mut sequence, length);
+                let seed = i32_from_bytes(x, z);
                 if options.print && specific_seed == 0 {
                     println!("{:06X}: {}", seed, rng::get_string_from_sequence(&sequence))
                 };
@@ -166,7 +164,6 @@ fn main() {
                     (least_i, least_i_seed) =
                         check_if_least(ipieces as u16, seed, least_i, least_i_seed);
                 };
-            }
         }
     }
 
