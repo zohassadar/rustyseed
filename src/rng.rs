@@ -7,9 +7,7 @@ const PIECE_MAP: [&str; 0x13] = [
 pub fn get_string_from_sequence(sequence: &Box<[u8]>) -> String {
     return sequence
         .iter()
-        .map(|&s| PIECE_MAP[s as usize])
-        .collect::<Vec<&str>>()
-        .join("");
+        .fold("".to_string(), |a, b| a + PIECE_MAP[*b as usize]);
 }
 
 pub fn get_pre_shuffle() -> (Vec<u16>, Vec<Vec<u16>>) {
