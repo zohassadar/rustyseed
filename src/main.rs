@@ -75,6 +75,8 @@ fn main() {
         };
     }
 
+    if specific_seed != 0 { return; };
+
     let mut least_t: u16 = length as u16;
     let mut least_j: u16 = length as u16;
     let mut least_z: u16 = length as u16;
