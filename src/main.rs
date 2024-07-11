@@ -65,7 +65,8 @@ fn main() {
             println!("invalid seed {:06X}", specific_seed);
             return;
         };
-        let sequence = rng::crunch_seed(s1, s2, s3, &shuffled, &by_repeats, length);
+        let mut sequence = vec![0; length as usize].into_boxed_slice();
+        let _ = rng::crunch_seed(s1, s2, s3, &shuffled, &by_repeats, &mut sequence, length);
         if options.print {
             println!(
                 "{:06X}: {}",
@@ -120,7 +121,8 @@ fn main() {
                     // duplicate seed
                     continue;
                 }
-                let sequence = rng::crunch_seed(x, y, z, &shuffled, &by_repeats, length);
+                let mut sequence = vec![0; length as usize].into_boxed_slice();
+                let _ = rng::crunch_seed(x,y,z, &shuffled, &by_repeats, &mut sequence, length);
                 let seed = i32_from_bytes(x, y, z);
                 if options.print && specific_seed == 0 {
                     println!("{:06X}: {}", seed, rng::get_string_from_sequence(&sequence))
