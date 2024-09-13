@@ -44,6 +44,10 @@ fn check_if_least(count: u16, seed: i32, current_least: u16, current_seed: i32) 
 
 fn main() {
     let options = TestOptions::parse_args_default_or_exit();
+    if options.length == 0 && options.seed == "" && !options.print && !options.stats {
+        println!("use -h or --help for options");
+        return;
+    };
     let length = if options.length > 0 {
         options.length
     } else {
@@ -75,7 +79,9 @@ fn main() {
         };
     }
 
-    if specific_seed != 0 { return; };
+    if specific_seed != 0 {
+        return;
+    };
 
     let mut least_t: u16 = length as u16;
     let mut least_j: u16 = length as u16;
@@ -110,60 +116,53 @@ fn main() {
     let mut most_i_seed: i32 = 0;
 
     for x in 0x00..=0xFFFF {
-            for z in 0x00..=0xFF {
-                if x & 0xFFFE == 0 {
-                    // invalid seed
-                    continue;
-                }
-                if z & 0x08 == 0x08 || x & 0x1 == 0x1 {
-                    // duplicate seed
-                    continue;
-                }
-                let mut sequence = vec![0; length as usize].into_boxed_slice();
-                let _ = rng::crunch_seed(x,z, &shuffled, &by_repeats, &mut sequence, length);
-                let seed = i32_from_bytes(x, z);
-                if options.print && specific_seed == 0 {
-                    println!("{:06X}: {}", seed, rng::get_string_from_sequence(&sequence))
-                };
-                if options.stats {
-                    let tpieces = sequence.clone().iter().filter(|&s| *s == 2).count();
-                    let jpieces = sequence.clone().iter().filter(|&s| *s == 7).count();
-                    let zpieces = sequence.clone().iter().filter(|&s| *s == 8).count();
-                    let opieces = sequence.clone().iter().filter(|&s| *s == 10).count();
-                    let spieces = sequence.clone().iter().filter(|&s| *s == 11).count();
-                    let lpieces = sequence.clone().iter().filter(|&s| *s == 14).count();
-                    let ipieces = sequence.clone().iter().filter(|&s| *s == 18).count();
+        for z in 0x00..=0xFF {
+            if x & 0xFFFE == 0 {
+                // invalid seed
+                continue;
+            }
+            if z & 0x08 == 0x08 || x & 0x1 == 0x1 {
+                // duplicate seed
+                continue;
+            }
+            let mut sequence = vec![0; length as usize].into_boxed_slice();
+            let _ = rng::crunch_seed(x, z, &shuffled, &by_repeats, &mut sequence, length);
+            let seed = i32_from_bytes(x, z);
+            if options.print && specific_seed == 0 {
+                println!("{:06X}: {}", seed, rng::get_string_from_sequence(&sequence))
+            };
+            if options.stats {
+                let tpieces = sequence.clone().iter().filter(|&s| *s == 2).count();
+                let jpieces = sequence.clone().iter().filter(|&s| *s == 7).count();
+                let zpieces = sequence.clone().iter().filter(|&s| *s == 8).count();
+                let opieces = sequence.clone().iter().filter(|&s| *s == 10).count();
+                let spieces = sequence.clone().iter().filter(|&s| *s == 11).count();
+                let lpieces = sequence.clone().iter().filter(|&s| *s == 14).count();
+                let ipieces = sequence.clone().iter().filter(|&s| *s == 18).count();
 
-                    (most_t, most_t_seed) =
-                        check_if_most(tpieces as u16, seed, most_t, most_t_seed);
-                    (most_j, most_j_seed) =
-                        check_if_most(jpieces as u16, seed, most_j, most_j_seed);
-                    (most_z, most_z_seed) =
-                        check_if_most(zpieces as u16, seed, most_z, most_z_seed);
-                    (most_o, most_o_seed) =
-                        check_if_most(opieces as u16, seed, most_o, most_o_seed);
-                    (most_s, most_s_seed) =
-                        check_if_most(spieces as u16, seed, most_s, most_s_seed);
-                    (most_l, most_l_seed) =
-                        check_if_most(lpieces as u16, seed, most_l, most_l_seed);
-                    (most_i, most_i_seed) =
-                        check_if_most(ipieces as u16, seed, most_i, most_i_seed);
+                (most_t, most_t_seed) = check_if_most(tpieces as u16, seed, most_t, most_t_seed);
+                (most_j, most_j_seed) = check_if_most(jpieces as u16, seed, most_j, most_j_seed);
+                (most_z, most_z_seed) = check_if_most(zpieces as u16, seed, most_z, most_z_seed);
+                (most_o, most_o_seed) = check_if_most(opieces as u16, seed, most_o, most_o_seed);
+                (most_s, most_s_seed) = check_if_most(spieces as u16, seed, most_s, most_s_seed);
+                (most_l, most_l_seed) = check_if_most(lpieces as u16, seed, most_l, most_l_seed);
+                (most_i, most_i_seed) = check_if_most(ipieces as u16, seed, most_i, most_i_seed);
 
-                    (least_t, least_t_seed) =
-                        check_if_least(tpieces as u16, seed, least_t, least_t_seed);
-                    (least_j, least_j_seed) =
-                        check_if_least(jpieces as u16, seed, least_j, least_j_seed);
-                    (least_z, least_z_seed) =
-                        check_if_least(zpieces as u16, seed, least_z, least_z_seed);
-                    (least_o, least_o_seed) =
-                        check_if_least(opieces as u16, seed, least_o, least_o_seed);
-                    (least_s, least_s_seed) =
-                        check_if_least(spieces as u16, seed, least_s, least_s_seed);
-                    (least_l, least_l_seed) =
-                        check_if_least(lpieces as u16, seed, least_l, least_l_seed);
-                    (least_i, least_i_seed) =
-                        check_if_least(ipieces as u16, seed, least_i, least_i_seed);
-                };
+                (least_t, least_t_seed) =
+                    check_if_least(tpieces as u16, seed, least_t, least_t_seed);
+                (least_j, least_j_seed) =
+                    check_if_least(jpieces as u16, seed, least_j, least_j_seed);
+                (least_z, least_z_seed) =
+                    check_if_least(zpieces as u16, seed, least_z, least_z_seed);
+                (least_o, least_o_seed) =
+                    check_if_least(opieces as u16, seed, least_o, least_o_seed);
+                (least_s, least_s_seed) =
+                    check_if_least(spieces as u16, seed, least_s, least_s_seed);
+                (least_l, least_l_seed) =
+                    check_if_least(lpieces as u16, seed, least_l, least_l_seed);
+                (least_i, least_i_seed) =
+                    check_if_least(ipieces as u16, seed, least_i, least_i_seed);
+            };
         }
     }
 
