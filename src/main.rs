@@ -18,8 +18,6 @@ struct TestOptions {
 
     #[options(help = "specific seed")]
     seed: String,
-
-    foo: bool,
 }
 
 fn parse_hex(s: &str) -> Result<u32, std::num::ParseIntError> {
@@ -42,12 +40,53 @@ fn check_if_least(count: u16, seed: i32, current_least: u16, current_seed: i32) 
     return (current_least, current_seed);
 }
 
+fn print_stats_from_pieces(pieces: &str) {
+    let mut _t: u32 = 0;
+    let mut _j: u32 = 0;
+    let mut _z: u32 = 0;
+    let mut _o: u32 = 0;
+    let mut _s: u32 = 0;
+    let mut _l: u32 = 0;
+    let mut _i: u32 = 0;
+
+    pieces.split("I");
+    let longest = match pieces.split("I").map(|s| s.chars().count()).max() {
+        Some(longest) => longest,
+        None => return,
+    };
+
+    for p in pieces.chars() {
+        match p {
+            'T' => _t += 1,
+            'J' => _j += 1,
+            'Z' => _z += 1,
+            'O' => _o += 1,
+            'S' => _s += 1,
+            'L' => _l += 1,
+            'I' => _i += 1,
+            _ => {}
+        }
+    }
+
+    println!("T: {}", _t);
+    println!("J: {}", _j);
+    println!("Z: {}", _z);
+    println!("O: {}", _o);
+    println!("S: {}", _s);
+    println!("L: {}", _l);
+    println!("I: {}", _i);
+    println!("Longest drought: {}", longest);
+}
+
 fn main() {
     let options = TestOptions::parse_args_default_or_exit();
     if options.length == 0 && options.seed == "" && !options.print && !options.stats {
         println!("use -h or --help for options");
         return;
     };
+    if !options.print && !options.stats {
+        println!("use -s/--stats or -p/--print");
+    }
     let length = if options.length > 0 {
         options.length
     } else {
@@ -70,13 +109,13 @@ fn main() {
         };
         let mut sequence = vec![0; length as usize].into_boxed_slice();
         let _ = rng::crunch_seed(s, s3, &shuffled, &by_repeats, &mut sequence, length);
+        let pieces = rng::get_string_from_sequence(&sequence);
         if options.print {
-            println!(
-                "{:06X}: {}",
-                specific_seed,
-                rng::get_string_from_sequence(&sequence)
-            )
+            println!("{:06X}: {}", specific_seed, pieces)
         };
+        if options.stats {
+            print_stats_from_pieces(&pieces)
+        }
     }
 
     if specific_seed != 0 {
